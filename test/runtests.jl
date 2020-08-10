@@ -69,16 +69,13 @@ function test_acc(T, fun_table, xx, tol; debug = true, tol_debug = 5)
             ": mean ", @sprintf("%f", rmean))
        
         t = @test trunc(rmax, digits=1) <= tol
-
     end
 end
 
-using Test
-
 for (func, (basefunc, base)) in (myexp2=>(exp2,Val(2)), myexp=>(exp,Val(ℯ)), myexp10=>(exp10,Val(10)))
+    tol = 1.5
     xx = range(MIN_EXP(base,Float64),  MAX_EXP(base,Float64), length = 10^6);
     fun_table = Dict(func => basefunc)
-    tol = 1.5
     test_acc(Float64, fun_table, xx, tol, debug = true, tol_debug = .5)
 
     xs = range(MIN_EXP(base,Float32),  MAX_EXP(base,Float32), length = 10^6);

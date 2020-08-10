@@ -10,7 +10,7 @@ MAGIC_ROUND_CONST(::Type{Float32}) = 1.048576f7
 MAX_EXP(::Val{2},  ::Type{Float64}) =  1024.0                   # log2 2^1023*(2-2^-52)
 MIN_EXP(::Val{2},  ::Type{Float64}) = -1075.0                   # log2 2^-1075
 MAX_EXP(::Val{2},  ::Type{Float32}) =  128f0                    # log2 2^127*(2-2^-52)
-MIN_EXP(::Val{2},  ::Type{Float32}) = -140f0                    # log2 2^-1075
+MIN_EXP(::Val{2},  ::Type{Float32}) = -149f0                    # log2 2^-1075
 MAX_EXP(::Val{ℯ},  ::Type{Float64}) =  709.7827128933845        # log 2^1023*(2-2^-52)
 MIN_EXP(::Val{ℯ},  ::Type{Float64}) = -745.1332191019412076235  # log 2^-1075
 MAX_EXP(::Val{ℯ},  ::Type{Float32}) =  88.72284                 # log 2^127 *(2-2^-23)
@@ -47,18 +47,19 @@ LogBL(base::Val{10}, ::Type{Float32}) = 1.4320989f-8
 
 # Range reduced kernels          
 @inline function expm1b_kernel(::Val{2}, x::Float64)
-    return x * evalpoly(x, (0.6931471805599393, 0.2402265069590989,
-                            0.055504115022757844, 0.009618130135925114))
+    return x * evalpoly(x, (0.6931471805599393, 0.24022650695910058,
+                            0.05550411502333161, 0.009618129548366803))
 end
 @inline function expm1b_kernel(::Val{ℯ}, x::Float64)
-    return x * evalpoly(x, (0.9999999999999998, 0.49999999999999983,
-                            0.1666666704849642, 0.04166666762124105))
+    return x * evalpoly(x, (0.9999999999999912, 0.4999999999999997, 
+                            0.1666666857598779, 0.04166666857598777))
 end
+
 @inline function expm1b_kernel(::Val{10}, x::Float64)
-    return x * evalpoly(x, (2.302585092994046, 2.6509490552382577,
-                            2.0346785922926713, 1.1712561359457612,
-                            0.5393833837413015))
+    return x * evalpoly(x, (2.3025850929940255, 2.6509490552391974, 
+                            2.034678825384765, 1.1712552025835192))
 end
+
 @inline function expb_kernel(::Val{2}, x::Float32)
     return evalpoly(x, (1.0f0, 0.6931472f0, 0.2402265f0, 0.05550411f0,
                         0.009618025f0, 0.0013333423f0, 
@@ -125,7 +126,7 @@ for (func, base) in (:exp2=>Val(2), :exp=>Val(ℯ), :exp10=>Val(10))
             return reinterpret(T, twopk + reinterpret(Int64, small_part))
         end
     end
-
+    
     @eval begin
         @inline function ($func)(x::T) where T<:Float32
             N_float = round(x*LogBINV($base, T))
@@ -135,8 +136,8 @@ for (func, base) in (:exp2=>Val(2), :exp=>Val(ℯ), :exp10=>Val(10))
             small_part = expb_kernel($base, r)
             if !(abs(N)<=Int32(24))
                 isnan(x) && return x
-                x >= MAX_EXP($base, T) && return Inf32
-                x <= MIN_EXP($base, T) && return 0.0f0
+                x > MAX_EXP($base, T) && return Inf32
+                x < MIN_EXP($base, T) && return 0.0f0
                 if N<=Int32(-24)
                     twopk = reinterpret(T, (N+Int32(151)) << Int32(23))
                     return (twopk*small_part)*(2f0^(-24))
