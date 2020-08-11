@@ -13,8 +13,8 @@ MAX_EXP(::Val{2},  ::Type{Float32}) =  128f0                    # log2 2^127*(2-
 MIN_EXP(::Val{2},  ::Type{Float32}) = -149f0                    # log2 2^-1075
 MAX_EXP(::Val{ℯ},  ::Type{Float64}) =  709.7827128933845        # log 2^1023*(2-2^-52)
 MIN_EXP(::Val{ℯ},  ::Type{Float64}) = -745.1332191019412076235  # log 2^-1075
-MAX_EXP(::Val{ℯ},  ::Type{Float32}) =  88.72284                 # log 2^127 *(2-2^-23)
-MIN_EXP(::Val{ℯ},  ::Type{Float32}) = -103.97208                # log 2^-150
+MAX_EXP(::Val{ℯ},  ::Type{Float32}) =  88.72284f0               # log 2^127 *(2-2^-23)
+MIN_EXP(::Val{ℯ},  ::Type{Float32}) = -103.97208f0              # log 2^-150
 MAX_EXP(::Val{10}, ::Type{Float64}) =  308.25471555991675       # log10 2^1023*(2-2^-52)
 MIN_EXP(::Val{10}, ::Type{Float64}) = -323.60724533877976       # log10 2^-1075
 MAX_EXP(::Val{10}, ::Type{Float32}) =  38.53184f0               # log10 2^127 *(2-2^-23)
@@ -61,9 +61,9 @@ end
 end
 
 @inline function expb_kernel(::Val{2}, x::Float32)
-    return evalpoly(x, (1.0f0, 0.6931472f0, 0.2402265f0, 0.05550411f0,
-                        0.009618025f0, 0.0013333423f0, 
-                        0.00015469732f0, 1.5316464f-5))
+    return evalpoly(x, (1.0f0, 0.6931472f0, 0.2402265f0,
+                        0.05550411f0, 0.009618025f0, 
+                        0.0013333423f0, 0.00015469732f0, 1.5316464f-5))
 end
 @inline function expb_kernel(::Val{ℯ}, x::Float32)
     return evalpoly(x, (1.0f0, 1.0f0, 0.5f0, 0.16666667f0, 
@@ -81,8 +81,9 @@ end
 # values would be the same if stored as regular Float64.
 # This only gains 8 bits since the least significant 4 bits of the exponent
 # of the small part are not the same for all table values.
-const JU_MASK = 0x3ff0000000000000
-const JL_MASK = 0x3c00000000000000
+const JU_MASK = 0x000FFFFFFFFFFFFF
+const JU_CONST = 0x3ff0000000000000
+const JL_CONST = 0x3c00000000000000
 const J_TABLE= zeros(UInt64, 256);
 for j in eachindex(J_TABLE)
     maskU = 0x000FFFFFFFFFFFFF
@@ -96,11 +97,21 @@ for j in eachindex(J_TABLE)
 end
 @inline function table_unpack(ind)
     j = @inbounds J_TABLE[ind]
-    jU = reinterpret(Float64, JU_MASK | (j&0x000FFFFFFFFFFFFF))
-    jL = reinterpret(Float64, JL_MASK | (j>>8))
+    jU = reinterpret(Float64, JU_CONST | (j&JU_MASK))
+    jL = reinterpret(Float64, JL_CONST | (j>>8))
     return jU, jL
 end
 
+# Method
+# 1. Argument reduction: Reduce x to an r so that |r| <= log(2)/512. Given x,
+#    find r and integers k, j such that
+#       x = (k + j/256)*log(2) + r,  0 <= j < 256, |r| <= log(2)/512.
+#
+# 2. Approximate exp(r) by it's degree 3 taylor series around 0.
+#    Since the bounds on r are very tight, this is sufficient to be accurate to floating point epsilon.
+#
+# 3. Scale back: exp(x) = 2^k * 2^(j/256) * exp(r)
+#    Since the range of possible j is small, 2^(j/256) is simply stored for all possible values.
 for (func, base) in (:exp2=>Val(2), :exp=>Val(ℯ), :exp10=>Val(10))
     @eval begin
         @inline function ($func)(x::T) where T<:Float64
