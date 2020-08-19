@@ -4,8 +4,8 @@ using Test, Printf
 
 # the following compares the ulp between x and y.
 # First it promotes them to the larger of the two types x,y
-const infh(::Type{Float64}) = 1e300
-const infh(::Type{Float32}) = 1e37
+const infh(::Type{Float64}) = 1e308
+const infh(::Type{Float32}) = 1e38
 function countulp(T, x::AbstractFloat, y::AbstractFloat)
     X, Y = promote(x, y)
     x, y = T(X), T(Y) # Cast to smaller type
@@ -72,13 +72,13 @@ function test_acc(T, fun_table, xx, tol; debug = true, tol_debug = 5)
     end
 end
 
-for (func, (basefunc, base)) in (myexp2=>(exp2,Val(2)), myexp=>(exp,Val(ℯ)), myexp10=>(exp10,Val(10)))
-    tol = 1.5
-    xx = range(MIN_EXP(base,Float64),  MAX_EXP(base,Float64), length = 10^6);
-    fun_table = Dict(func => basefunc)
-    test_acc(Float64, fun_table, xx, tol, debug = true, tol_debug = .5)
-
-    xs = range(MIN_EXP(base,Float32),  MAX_EXP(base,Float32), length = 10^6);
-    fun_table = Dict(func => basefunc)
-    test_acc(Float32, fun_table, xs, tol, debug = true, tol_debug = .5)
+for (func, (basefunc, base)) in (exp2=>(Base.exp2,Val(2)), exp=>(Base.exp,Val(ℯ)), exp10=>(Base.exp10,Val(10)))
+    for T in (Float32, Float64)
+        @test func(T(Inf)) === T(Inf)
+        @test func(-T(Inf)) === zero(T)
+        @test func(T(NaN)) === T(NaN)
+        xx = range(MIN_EXP(base,T),  MAX_EXP(base,T), length = 10^6);
+        fun_table = Dict(func => basefunc)
+        test_acc(T, fun_table, xx, 1.5, debug = true, tol_debug = .5)
+    end
 end
