@@ -1,6 +1,6 @@
 using Base.Math: significand_bits, exponent_bias
 
-using Test, Printf
+using Base.Test, Printf
 
 # the following compares the ulp between x and y.
 # First it promotes them to the larger of the two types x,y

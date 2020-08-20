@@ -94,15 +94,15 @@ end
 end
 
 # Method
-# 1. Argument reduction: Reduce x to an r so that |r| <= log(2)/512. Given x,
+# 1. Argument reduction: Reduce x to an r so that |r| <= log(2)/512. Given x, base b,
 #    find r and integers k, j such that
-#       x = (k + j/256)*log(2) + r,  0 <= j < 256, |r| <= log(2)/512.
+#       x = (k + j/256)*log(b, 2) + r,  0 <= j < 256, |r| <= log(b,2)/512.
 #
-# 2. Approximate exp(r) by it's degree 3 taylor series around 0.
+# 2. Approximate b^r-1 by 3rd-degree minimax polynomial p_b(r) on the interval [-log(b,2)/512, log(b,2)/512].
 #    Since the bounds on r are very tight, this is sufficient to be accurate to floating point epsilon.
 #
-# 3. Scale back: exp(x) = 2^k * 2^(j/256) * exp(r)
-#    Since the range of possible j is small, 2^(j/256) is simply stored for all possible values.
+# 3. Scale back: b^x = 2^k * 2^(j/256) * (1 + p_b(r))
+#    Since the range of possible j is small, 2^(j/256) is stored for all possible values in slightly extended precision.
 for (func, base) in (:exp2=>Val(2), :exp=>Val(ℯ), :exp10=>Val(10))
     @eval begin
         @inline function ($func)(x::T) where T<:Float64
